@@ -7,7 +7,13 @@ import { isSlackBotMention, parseSlackWebhookBody } from "./webhook";
 const BODY_PATTERN = /body: '((?:[^'\\]|\\.)*)'/g;
 const BOT_USER_ID = "U00FAKEBOT01";
 
-/** The `body` strings logged in sample-messages.md, as raw webhook bodies. */
+/**
+ * The `body` strings logged in sample-messages.md, as raw webhook bodies.
+ * Each sample is a `body: '…'` line holding a single-quoted JS string of JSON,
+ * so the literal is converted to a JSON string before parsing. The test below
+ * asserts the exact list of `app_mention` samples, so a format change that
+ * stops these matching fails it rather than passing with nothing checked.
+ */
 async function sampleBodies(): Promise<string[]> {
   const markdown = await readFile(
     new URL("../sample-messages.md", import.meta.url),

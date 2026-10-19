@@ -3,6 +3,7 @@
  * `SlackAdapter` and the `@chat-adapter/slack/webhook` subpath, so it imports
  * no runtime packages.
  */
+import { maskCodeSpans } from "@chat-adapter/shared/mentions";
 import {
   attachmentContent,
   authorAttachments,
@@ -271,45 +272,6 @@ function rendersAnyUserMention(
     (attachment) =>
       classifyAttachmentMention(attachment, ANY_USER_MATCHER) === "mention"
   );
-}
-
-/**
- * Replace every inline code span and fenced code block in mrkdwn with a
- * space, so a scan of the result cannot read a token inside code as a
- * mention. An unterminated fence and an inline span that crosses a line break
- * are plain text, not code.
- */
-function maskCodeSpans(text: string): string {
-  let result = "";
-  let index = 0;
-  while (index < text.length) {
-    const codeEnd = findCodeEnd(text, index);
-    if (codeEnd > index) {
-      result += " ";
-      index = codeEnd;
-      continue;
-    }
-    result += text[index];
-    index += 1;
-  }
-  return result;
-}
-
-function findCodeEnd(text: string, index: number): number {
-  if (text[index] !== "`") {
-    return index;
-  }
-  const fence = text.startsWith("```", index);
-  const marker = fence ? "```" : "`";
-  const start = index + marker.length;
-  const close = text.indexOf(marker, start);
-  if (close === -1) {
-    return index;
-  }
-  if (!fence && text.slice(start, close).includes("\n")) {
-    return index;
-  }
-  return close + marker.length;
 }
 
 /** See `SlackAdapter.detectSelfMention`. */

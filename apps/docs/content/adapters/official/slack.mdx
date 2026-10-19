@@ -1196,7 +1196,7 @@ For freeform answers, use `buildSlackFreeformView` with `openSlackView`, then re
 The low-level Slack subpaths are designed to avoid the full runtime import graph:
 
 - no `chat` import
-- no `@chat-adapter/shared` import
+- no `@chat-adapter/shared` import, except its runtime-free `@chat-adapter/shared/mentions` subpath in `@chat-adapter/slack/webhook`
 - no `@slack/web-api` import
 - no `@slack/socket-mode` import
 

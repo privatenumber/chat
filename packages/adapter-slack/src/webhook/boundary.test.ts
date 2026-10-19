@@ -23,6 +23,13 @@ describe("webhook import boundary", () => {
       )
     ).join("\n");
 
+    // The runtime-free mentions subpath is the only allowed shared import.
+    const sharedImports = source.match(
+      /from ["']@chat-adapter\/shared[^"']*["']/g
+    );
+    expect(sharedImports).toStrictEqual([
+      'from "@chat-adapter/shared/mentions"',
+    ]);
     expect(source).not.toContain('from "chat"');
     expect(source).not.toContain("from '@chat-adapter/shared'");
     expect(source).not.toContain('from "@chat-adapter/shared"');

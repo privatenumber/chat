@@ -22,8 +22,18 @@ import type {
   Message,
   StateAdapter,
 } from "chat";
-import { Chat } from "chat";
+import {
+  Actions,
+  Button,
+  Card,
+  CardText,
+  Chat,
+  Field,
+  Fields,
+  Image,
+} from "chat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cardToBlockKit, cardToFallbackText } from "./cards";
 import type {
   SlackAdapterConfig,
   SlackEvent,
@@ -1953,6 +1963,365 @@ describe("parseMessage", () => {
       expect(message.text).toBe(
         "Deploy *prod*\n\nStatus: succeeded\n\nRegion: iad1\n\nDuration: 2m\n\nTriggered by CI"
       );
+    }
+  });
+
+  it("keeps the text body when a block type has no layout rendering", async () => {
+    // The markdown block's content only reaches the message through `text`.
+    const event: SlackEvent = {
+      type: "message",
+      user: "U123",
+      channel: "C456",
+      text: "Release notes\n\nAdded dark mode",
+      ts: "1786120899.208432",
+      blocks: [
+        {
+          type: "section",
+          text: { type: "mrkdwn", text: "Release notes" },
+        },
+        { type: "markdown", text: "**Added** dark mode" },
+      ] as SlackEvent["blocks"],
+    };
+
+    const sync = adapter.parseMessage(event);
+    const internals = adapter as unknown as {
+      parseSlackMessage(
+        value: SlackEvent,
+        threadId: string
+      ): Promise<Message<unknown>>;
+    };
+    const async = await internals.parseSlackMessage(
+      event,
+      "slack:C456:1786120899.208432"
+    );
+
+    for (const message of [sync, async]) {
+      expect(message.text).toBe("Release notes\n\nAdded dark mode");
+    }
+  });
+
+  it("keeps the text body when rich_text sits next to a section block", async () => {
+    // Mixed rich_text and layout blocks are not rendered from blocks; the
+    // fallback text stays the body even though it omits the section.
+    const event: SlackEvent = {
+      type: "message",
+      user: "U123",
+      channel: "C456",
+      text: "Typed by a person",
+      ts: "1786120899.208433",
+      blocks: [
+        {
+          type: "rich_text",
+          elements: [
+            {
+              type: "rich_text_section",
+              elements: [{ type: "text", text: "Typed by a person" }],
+            },
+          ],
+        },
+        {
+          type: "section",
+          text: { type: "mrkdwn", text: "Added by an app" },
+        },
+      ] as SlackEvent["blocks"],
+    };
+
+    const sync = adapter.parseMessage(event);
+    const internals = adapter as unknown as {
+      parseSlackMessage(
+        value: SlackEvent,
+        threadId: string
+      ): Promise<Message<unknown>>;
+    };
+    const async = await internals.parseSlackMessage(
+      event,
+      "slack:C456:1786120899.208433"
+    );
+
+    for (const message of [sync, async]) {
+      expect(message.text).toBe("Typed by a person");
+    }
+  });
+
+  it("renders a table between layout blocks in block order", async () => {
+    const event: SlackEvent = {
+      type: "message",
+      user: "U123",
+      channel: "C456",
+      text: "Weekly report",
+      ts: "1786120899.208434",
+      blocks: [
+        { type: "section", text: { type: "mrkdwn", text: "Summary" } },
+        {
+          type: "data_table",
+          rows: [
+            [
+              { type: "raw_text", text: "Region" },
+              { type: "raw_text", text: "Units" },
+            ],
+            [
+              { type: "raw_text", text: "us-east" },
+              { type: "raw_text", text: "3" },
+            ],
+          ],
+        },
+        { type: "section", text: { type: "mrkdwn", text: "Footer note" } },
+      ] as SlackEvent["blocks"],
+    };
+
+    const sync = adapter.parseMessage(event);
+    const internals = adapter as unknown as {
+      parseSlackMessage(
+        value: SlackEvent,
+        threadId: string
+      ): Promise<Message<unknown>>;
+    };
+    const async = await internals.parseSlackMessage(
+      event,
+      "slack:C456:1786120899.208434"
+    );
+
+    for (const message of [sync, async]) {
+      expect(message.formatted.children.map((node) => node.type)).toEqual([
+        "paragraph",
+        "table",
+        "paragraph",
+      ]);
+      expect(message.text).toBe(
+        "Summary\n\nRegion\tUnits\nus-east\t3\n\nFooter note"
+      );
+    }
+  });
+
+  it("reads links from layout block text and not from the fallback text", async () => {
+    const event: SlackEvent = {
+      type: "message",
+      user: "U123",
+      channel: "C456",
+      text: "Incident update <https://fallback.example.com>",
+      ts: "1786120899.208435",
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "See the <https://status.example.com|status page>",
+          },
+        },
+      ] as SlackEvent["blocks"],
+    };
+
+    const sync = adapter.parseMessage(event);
+    const internals = adapter as unknown as {
+      parseSlackMessage(
+        value: SlackEvent,
+        threadId: string
+      ): Promise<Message<unknown>>;
+    };
+    const async = await internals.parseSlackMessage(
+      event,
+      "slack:C456:1786120899.208435"
+    );
+
+    for (const message of [sync, async]) {
+      expect(message.links.map((link) => link.url)).toEqual([
+        "https://status.example.com",
+      ]);
+    }
+  });
+
+  it("renders an image title but not its alt text", async () => {
+    const event: SlackEvent = {
+      type: "message",
+      user: "U123",
+      channel: "C456",
+      text: "New chart",
+      ts: "1786120899.208436",
+      blocks: [
+        {
+          type: "image",
+          image_url: "https://example.com/latency.png",
+          alt_text: "Line chart of p95 latency",
+          title: { type: "plain_text", text: "Latency this week" },
+        },
+      ] as SlackEvent["blocks"],
+    };
+
+    const sync = adapter.parseMessage(event);
+    const internals = adapter as unknown as {
+      parseSlackMessage(
+        value: SlackEvent,
+        threadId: string
+      ): Promise<Message<unknown>>;
+    };
+    const async = await internals.parseSlackMessage(
+      event,
+      "slack:C456:1786120899.208436"
+    );
+
+    for (const message of [sync, async]) {
+      expect(message.text).toBe("Latency this week");
+      expect(message.text).not.toContain("p95");
+    }
+  });
+
+  it("renders layout blocks when an image has no title", async () => {
+    const event: SlackEvent = {
+      type: "message",
+      user: "U123",
+      channel: "C456",
+      text: "New chart",
+      ts: "1786120899.208437",
+      blocks: [
+        {
+          type: "image",
+          image_url: "https://example.com/latency.png",
+          alt_text: "Line chart of p95 latency",
+        },
+        {
+          type: "section",
+          text: { type: "mrkdwn", text: "p95 latency is back under 200ms" },
+        },
+      ] as SlackEvent["blocks"],
+    };
+
+    const sync = adapter.parseMessage(event);
+    const internals = adapter as unknown as {
+      parseSlackMessage(
+        value: SlackEvent,
+        threadId: string
+      ): Promise<Message<unknown>>;
+    };
+    const async = await internals.parseSlackMessage(
+      event,
+      "slack:C456:1786120899.208437"
+    );
+
+    for (const message of [sync, async]) {
+      expect(message.text).toBe("p95 latency is back under 200ms");
+    }
+  });
+
+  it("renders each layout text object as its own paragraph", async () => {
+    const event: SlackEvent = {
+      type: "message",
+      user: "U123",
+      channel: "C456",
+      text: "Standup",
+      ts: "1786120899.208438",
+      blocks: [
+        { type: "header", text: { type: "plain_text", text: "Standup" } },
+        {
+          type: "context",
+          elements: [{ type: "plain_text", text: "Posted by the standup bot" }],
+        },
+        {
+          type: "section",
+          text: { type: "plain_text", text: "No blockers today" },
+        },
+      ] as SlackEvent["blocks"],
+    };
+
+    const sync = adapter.parseMessage(event);
+    const internals = adapter as unknown as {
+      parseSlackMessage(
+        value: SlackEvent,
+        threadId: string
+      ): Promise<Message<unknown>>;
+    };
+    const async = await internals.parseSlackMessage(
+      event,
+      "slack:C456:1786120899.208438"
+    );
+
+    for (const message of [sync, async]) {
+      expect(message.formatted.children).toHaveLength(3);
+      expect(message.formatted.children.map((node) => node.type)).toEqual([
+        "paragraph",
+        "paragraph",
+        "paragraph",
+      ]);
+      expect(message.text).toBe(
+        "Standup\n\nPosted by the standup bot\n\nNo blockers today"
+      );
+    }
+  });
+
+  it("renders plain_text layout text literally without decoding entities", async () => {
+    // Slack shows plain_text as typed, so `&amp;` stays `&amp;`.
+    const event: SlackEvent = {
+      type: "message",
+      user: "U123",
+      channel: "C456",
+      text: "A & B",
+      ts: "1786120899.208439",
+      blocks: [
+        { type: "header", text: { type: "plain_text", text: "A &amp; B <c>" } },
+      ] as SlackEvent["blocks"],
+    };
+
+    const sync = adapter.parseMessage(event);
+    const internals = adapter as unknown as {
+      parseSlackMessage(
+        value: SlackEvent,
+        threadId: string
+      ): Promise<Message<unknown>>;
+    };
+    const async = await internals.parseSlackMessage(
+      event,
+      "slack:C456:1786120899.208439"
+    );
+
+    for (const message of [sync, async]) {
+      expect(message.text).toBe("A &amp; B <c>");
+    }
+  });
+
+  it("reads a bot card's blocks back into the message body", async () => {
+    const card = Card({
+      title: "Order shipped",
+      children: [
+        CardText("Your order is on its way."),
+        Fields([
+          Field({ label: "Tracking", value: "ABC123" }),
+          Field({ label: "ETA", value: "Dec 25" }),
+        ]),
+        Image({ url: "https://example.com/box.png", alt: "Package photo" }),
+        Actions([
+          Button({ id: "track", label: "Track package" }),
+          Button({ id: "cancel", label: "Cancel order" }),
+        ]),
+      ],
+    });
+    const event: SlackEvent = {
+      type: "message",
+      user: "U123",
+      channel: "C456",
+      text: cardToFallbackText(card),
+      ts: "1786120899.208440",
+      blocks: cardToBlockKit(card) as SlackEvent["blocks"],
+    };
+
+    const sync = adapter.parseMessage(event);
+    const internals = adapter as unknown as {
+      parseSlackMessage(
+        value: SlackEvent,
+        threadId: string
+      ): Promise<Message<unknown>>;
+    };
+    const async = await internals.parseSlackMessage(
+      event,
+      "slack:C456:1786120899.208440"
+    );
+
+    for (const message of [sync, async]) {
+      // Same content as the fallback, laid out the way Slack shows the
+      // blocks: each field keeps its label and value on separate lines.
+      expect(message.text).toBe(
+        "Order shipped\n\nYour order is on its way.\n\nTracking\nABC123\n\nETA\nDec 25"
+      );
+      expect(message.text).not.toContain("Track package");
+      expect(message.text).not.toContain("Cancel order");
     }
   });
 
@@ -8356,6 +8725,38 @@ describe("resolveInlineMentions", () => {
 
     expect(message.isMention).toBe(true);
     expect(message.text).toBe("@Test Bot please check the deploy");
+  });
+
+  it("resolves a mention in a table cell of a layout body", async () => {
+    const message = await parseIncoming({
+      type: "message",
+      user: "U_SENDER",
+      channel: "C456",
+      text: "On-call rota",
+      ts: "1234567890.202026",
+      blocks: [
+        { type: "section", text: { type: "mrkdwn", text: "On-call rota" } },
+        {
+          type: "table",
+          rows: [
+            [
+              { type: "raw_text", text: "Primary" },
+              {
+                type: "rich_text",
+                elements: [
+                  {
+                    type: "rich_text_section",
+                    elements: [{ type: "user", user_id: "U777" }],
+                  },
+                ],
+              },
+            ],
+          ],
+        },
+      ],
+    });
+
+    expect(message.text).toBe("On-call rota\n\nPrimary\t@User");
   });
 
   it("does not flag a bot id in a plain_text section block", async () => {

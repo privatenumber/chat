@@ -1194,6 +1194,67 @@ function layoutBlockBody(event: SlackEvent): SlackBodyItem[] | null {
   return items.some((item) => !("table" in item)) ? items : null;
 }
 
+/** See `SlackAdapter.detectSelfMention`. */
+function classifySelfMention(
+  event: SlackEvent,
+  rawText: string,
+  attachments: SlackAttachmentContent[],
+  botUserId: string | undefined
+): boolean | undefined {
+  const blocks = event.blocks ?? [];
+  if (!botUserId) {
+    return event.type === "app_mention"
+      ? rendersAnyUserMention(blocks, rawText, attachments)
+      : undefined;
+  }
+
+  const matcher = mentionMatcher(botUserId);
+  const evidence = combineEvidence([
+    classifyBodyMention(blocks, rawText, matcher),
+    ...attachments.map((attachment) =>
+      classifyAttachmentMention(attachment, matcher)
+    ),
+  ]);
+  if (evidence === "mention") {
+    return true;
+  }
+
+  if (event.type === "app_mention" && evidence === "none") {
+    return rendersAnyUserMention(blocks, rawText, attachments);
+  }
+
+  // Slack mentions are user-id tokens. With the content inspected, the
+  // absence of one is a definitive non-mention, so a display name in plain or
+  // code-styled text cannot fall through to the SDK's name matching.
+  return false;
+}
+
+/**
+ * Whether a Slack `message` or `app_mention` event invokes the bot with
+ * `botUserId`, classified the same way `SlackAdapter` sets `message.isMention`.
+ *
+ * Slack fires `app_mention` for the bot's token anywhere in `text`, including
+ * inside inline code or a code block, so the event type alone does not show
+ * that a user addressed the bot. This reads the rendered content instead: a
+ * mention outside code invokes the bot, and a reference only inside code does
+ * not. Use it to make the same decision outside the adapter, such as in a
+ * webhook router that acknowledges or forwards events before a Chat SDK bot
+ * handles them.
+ */
+export function isSlackBotMention(
+  event: SlackEvent,
+  botUserId: string
+): boolean {
+  return (
+    classifySelfMention(
+      event,
+      event.text || "",
+      authorAttachments(event).map(attachmentContent),
+      botUserId
+    ) === true
+  );
+}
+
 function mentionIds(
   tables: SlackTableData[],
   parts: SlackAttachmentPart[]
@@ -4829,33 +4890,7 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
     rawText: string,
     attachments: SlackAttachmentContent[]
   ): boolean | undefined {
-    const blocks = event.blocks ?? [];
-    const botUserId = this.botUserId;
-    if (!botUserId) {
-      return event.type === "app_mention"
-        ? rendersAnyUserMention(blocks, rawText, attachments)
-        : undefined;
-    }
-
-    const matcher = mentionMatcher(botUserId);
-    const evidence = combineEvidence([
-      classifyBodyMention(blocks, rawText, matcher),
-      ...attachments.map((attachment) =>
-        classifyAttachmentMention(attachment, matcher)
-      ),
-    ]);
-    if (evidence === "mention") {
-      return true;
-    }
-
-    if (event.type === "app_mention" && evidence === "none") {
-      return rendersAnyUserMention(blocks, rawText, attachments);
-    }
-
-    // Slack mentions are user-id tokens. With the content inspected, the
-    // absence of one is a definitive non-mention, so a display name in plain or
-    // code-styled text cannot fall through to the SDK's name matching.
-    return false;
+    return classifySelfMention(event, rawText, attachments, this.botUserId);
   }
 
   protected async parseSlackMessage(

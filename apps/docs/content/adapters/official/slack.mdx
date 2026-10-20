@@ -938,17 +938,17 @@ Interaction payloads expose convenience fields from Slack's raw payload:
 
 #### Mention detection
 
-Slack sends an `app_mention` event for the bot's `<@U…>` token anywhere in a message's `text`, including inside inline code or a code block, so the event type alone does not show that a user addressed the bot. `isSlackBotMention` makes the same decision the adapter uses for `message.isMention`: a mention outside code invokes the bot, and a reference only inside code does not.
+Slack sends an `app_mention` event for the bot's `<@U…>` token anywhere in a message's `text`, including inside inline code or a code block, so the event type alone does not show that a user addressed the bot. `isBotMention` makes the same decision the adapter uses for `message.isMention`: a mention outside code invokes the bot, and a reference only inside code does not.
 
 ```typescript
-import { isSlackBotMention } from "@chat-adapter/slack/webhook";
+import { isBotMention } from "@chat-adapter/slack/webhook";
 
-if (payload.kind === "app_mention" && !isSlackBotMention(payload.raw, botUserId)) {
+if (payload.kind === "app_mention" && !isBotMention(payload.raw, botUserId)) {
   return new Response(null, { status: 200 });
 }
 ```
 
-Pass the payload's `raw` event and the bot's own user ID, which [`auth.test`](https://docs.slack.dev/reference/methods/auth.test) returns as `user_id`. The function is also exported from `@chat-adapter/slack`.
+Pass the payload's `raw` event and the bot's own user ID, which [`auth.test`](https://docs.slack.dev/reference/methods/auth.test) returns as `user_id`. The function is also exported from `@chat-adapter/slack`. It implements the [`isBotMention` contract](/docs/contributing/building#isbotmention) for adapters.
 
 ### Formatting
 

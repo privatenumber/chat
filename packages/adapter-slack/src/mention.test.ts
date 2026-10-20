@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { mockLogger } from "@chat-adapter/tests";
 import { describe, expect, it } from "vitest";
 import { createSlackAdapter, type SlackEvent } from "./index";
-import { isSlackBotMention, parseSlackWebhookBody } from "./webhook";
+import { isBotMention, parseSlackWebhookBody } from "./webhook";
 
 const BODY_PATTERN = /body: '((?:[^'\\]|\\.)*)'/g;
 const BOT_USER_ID = "U00FAKEBOT01";
@@ -24,7 +24,7 @@ async function sampleBodies(): Promise<string[]> {
   );
 }
 
-describe("isSlackBotMention", () => {
+describe("isBotMention", () => {
   it("classifies captured app_mention payloads like message.isMention", async () => {
     const adapter = createSlackAdapter({
       botToken: "xoxb-test-token",
@@ -41,7 +41,7 @@ describe("isSlackBotMention", () => {
       if (payload.kind !== "app_mention") {
         continue;
       }
-      const isMention = isSlackBotMention(payload.raw, BOT_USER_ID);
+      const isMention = isBotMention(payload.raw, BOT_USER_ID);
       expect(isMention).toBe(
         adapter.parseMessage(payload.raw as unknown as SlackEvent).isMention
       );

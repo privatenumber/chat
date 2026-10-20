@@ -324,8 +324,11 @@ export function classifySelfMention(
  * `event` is the inner Events API `event` object, such as the `raw` field of
  * a payload from `parseSlackWebhookBody`. `botUserId` is the bot's own user
  * ID, which `auth.test` returns as `user_id`.
+ *
+ * Implements the adapter `isBotMention` contract in the Chat SDK guide to
+ * building adapters.
  */
-export function isSlackBotMention(
+export function isBotMention(
   event: SlackEvent | Record<string, unknown>,
   botUserId: string
 ): boolean {

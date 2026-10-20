@@ -1,4 +1,4 @@
-export { isSlackBotMention } from "../mention";
+export { isBotMention } from "../mention";
 export { parseSlackWebhookBody } from "./parse";
 export type * from "./types";
 export {

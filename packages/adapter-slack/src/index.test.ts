@@ -43,7 +43,7 @@ import type {
 import {
   buildFeedbackButtonsBlock,
   createSlackAdapter,
-  isSlackBotMention,
+  isBotMention,
   SlackAdapter,
 } from "./index";
 import { incomingMessage } from "./test-fixtures";
@@ -15663,7 +15663,7 @@ describe("event routing via authorizations[]", () => {
   });
 });
 
-describe("isSlackBotMention", () => {
+describe("isBotMention", () => {
   const richText = (...elements: Record<string, unknown>[]) => [
     {
       type: "rich_text",
@@ -15763,7 +15763,7 @@ describe("isSlackBotMention", () => {
       botUserId: "U_BOT",
     });
 
-    expect(isSlackBotMention(event, "U_BOT")).toBe(expected);
+    expect(isBotMention(event, "U_BOT")).toBe(expected);
     expect(adapter.parseMessage(event).isMention).toBe(expected);
   });
 });

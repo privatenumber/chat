@@ -7449,4 +7449,4 @@ export {
   SlackFormatConverter,
   SlackFormatConverter as SlackMarkdownConverter,
 } from "./markdown";
-export { isSlackBotMention } from "./mention";
+export { isBotMention } from "./mention";

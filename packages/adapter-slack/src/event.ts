@@ -3,8 +3,14 @@
  * parsing and mention classification. It imports no runtime packages, so the
  * `@chat-adapter/slack/webhook` subpath can use it.
  */
-import type { SlackBlock } from "./cards";
 import { escapeSlackText } from "./format";
+
+/** A Slack Block Kit block (simplified). */
+export interface SlackBlock {
+  block_id?: string;
+  type: string;
+  [key: string]: unknown;
+}
 
 export const SLACK_USER_ID_PATTERN = /^[A-Z0-9_]+$/;
 

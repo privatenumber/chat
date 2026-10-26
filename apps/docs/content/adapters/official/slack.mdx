@@ -948,7 +948,7 @@ if (payload.kind === "app_mention" && !isBotMention(payload.raw, botUserId)) {
 }
 ```
 
-Pass the payload's `raw` event and the bot's own user ID, which [`auth.test`](https://docs.slack.dev/reference/methods/auth.test) returns as `user_id`. The function is also exported from `@chat-adapter/slack`. It implements the [`isBotMention` contract](/docs/contributing/building#isbotmention) for adapters.
+Pass the payload's `raw` event and the bot's own user ID, which [`auth.test`](https://docs.slack.dev/reference/methods/auth.test) returns as `user_id`; any other value throws a `TypeError`. For a `message_changed` event, pass its `message`, which holds the edited content. The function is also exported from `@chat-adapter/slack`. It implements the [`isBotMention` contract](/docs/contributing/building#isbotmention) for adapters.
 
 ### Formatting
 

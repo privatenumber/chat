@@ -7437,13 +7437,12 @@ export type {
 } from "./agent-context";
 // Re-export agent active-view context helpers for advanced use
 export { getAppContext, normalizeAppContextEntities } from "./agent-context";
-export type { SlackBlock } from "./cards";
 // Re-export card converter for advanced use
 export { cardToBlockKit, cardToFallbackText } from "./cards";
 export type { EncryptedTokenData } from "./crypto";
 // Re-export crypto utilities for advanced use
 export { decodeKey } from "./crypto";
-export type { SlackEvent, SlackMessageBlock } from "./event";
+export type { SlackBlock, SlackEvent, SlackMessageBlock } from "./event";
 // Re-export format converter for advanced use
 export {
   SlackFormatConverter,

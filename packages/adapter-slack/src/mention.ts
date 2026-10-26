@@ -15,8 +15,11 @@ import {
   type SlackMessageBlock,
 } from "./event";
 
+/** Slack user IDs, matched case-insensitively like mention tokens. */
+const BOT_USER_ID_PATTERN = /^[A-Z0-9_]+$/i;
+
 function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?${}()|[\]\\]/g, "\\$&");
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**
@@ -323,7 +326,9 @@ export function classifySelfMention(
  *
  * `event` is the inner Events API `event` object, such as the `raw` field of
  * a payload from `parseSlackWebhookBody`. `botUserId` is the bot's own user
- * ID, which `auth.test` returns as `user_id`.
+ * ID, which `auth.test` returns as `user_id`; anything else throws a
+ * `TypeError`. For a `message_changed` event, pass its `message`, which holds
+ * the edited content.
  *
  * Implements the adapter `isBotMention` contract in the Chat SDK guide to
  * building adapters.
@@ -332,6 +337,13 @@ export function isBotMention(
   event: SlackEvent | Record<string, unknown>,
   botUserId: string
 ): boolean {
+  // The adapter treats a missing id as unresolved and trusts any app_mention
+  // that renders a mention; a caller-supplied id must be a real Slack user id.
+  if (!BOT_USER_ID_PATTERN.test(botUserId)) {
+    throw new TypeError(
+      `isBotMention: botUserId must be a Slack user ID, received ${JSON.stringify(botUserId)}`
+    );
+  }
   const slackEvent = event as SlackEvent;
   const text = typeof slackEvent.text === "string" ? slackEvent.text : "";
   return (

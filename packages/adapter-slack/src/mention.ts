@@ -339,7 +339,9 @@ export function isBotMention(
 ): boolean {
   // The adapter treats a missing id as unresolved and trusts any app_mention
   // that renders a mention; a caller-supplied id must be a real Slack user id.
-  if (!BOT_USER_ID_PATTERN.test(botUserId)) {
+  // `RegExp.test` stringifies its argument, so check the type first: an unset
+  // value would otherwise match as "undefined" or "null".
+  if (typeof botUserId !== "string" || !BOT_USER_ID_PATTERN.test(botUserId)) {
     throw new TypeError(
       `isBotMention: botUserId must be a Slack user ID, received ${JSON.stringify(botUserId)}`
     );

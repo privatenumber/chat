@@ -4,9 +4,10 @@ import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-// `from "x"` clauses of import and export statements, and side-effect imports.
+// `from "x"` clauses of import and export statements, side-effect imports,
+// and dynamic `import("x")`.
 const IMPORT_SPECIFIER =
-  /\bfrom\s*["']([^"']+)["']|^\s*import\s*["']([^"']+)["']/gm;
+  /\bfrom\s*["']([^"']+)["']|^\s*import\s*["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']\s*\)/gm;
 const SOURCE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 /**
@@ -23,10 +24,10 @@ async function importGraph(entry: string) {
     }
     files.add(file);
     const source = await readFile(file, { encoding: "utf8" });
-    for (const [, fromClause, sideEffect] of source.matchAll(
+    for (const [, fromClause, sideEffect, dynamic] of source.matchAll(
       IMPORT_SPECIFIER
     )) {
-      const specifier = fromClause ?? sideEffect;
+      const specifier = fromClause ?? sideEffect ?? dynamic;
       if (!specifier.startsWith(".")) {
         packages.add(specifier);
         continue;

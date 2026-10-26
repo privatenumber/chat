@@ -247,7 +247,14 @@ describe("isBotMention", () => {
     expect(createAdapter("U_BOT").parseMessage(event).isMention).toBe(expected);
   });
 
-  it.each(["", "U^BOT", "U BOT"])("rejects the bot user ID %j", (botUserId) => {
+  it.each([
+    "",
+    "U^BOT",
+    "U BOT",
+    // Untyped callers, such as an unset environment variable.
+    undefined as unknown as string,
+    null as unknown as string,
+  ])("rejects the bot user ID %j", (botUserId) => {
     expect(() =>
       isBotMention({ type: "app_mention", text: "<@U_OTHER> hi" }, botUserId)
     ).toThrow(TypeError);
